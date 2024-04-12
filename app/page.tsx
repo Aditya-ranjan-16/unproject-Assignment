@@ -1,11 +1,11 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { Suspense } from 'react'
-
-const Logo = dynamic(() => import('@/components/canvas/Examples').then((mod) => mod.Logo), { ssr: false })
-const Dog = dynamic(() => import('@/components/canvas/Examples').then((mod) => mod.Dog), { ssr: false })
-const Duck = dynamic(() => import('@/components/canvas/Examples').then((mod) => mod.Duck), { ssr: false })
+import { Suspense, useEffect, useRef } from 'react'
+import { useState, type ChangeEvent, type DragEvent } from 'react'
+import { cn } from './lib/utils'
+import { useGLTF } from '@react-three/drei'
+import * as THREE from 'three'
 const View = dynamic(() => import('@/components/canvas/View').then((mod) => mod.View), {
   ssr: false,
   loading: () => (
@@ -23,60 +23,135 @@ const View = dynamic(() => import('@/components/canvas/View').then((mod) => mod.
 })
 const Common = dynamic(() => import('@/components/canvas/View').then((mod) => mod.Common), { ssr: false })
 
+function Model({ gltf }) {
+  if (gltf) {
+    const grpref = useRef()
+    const { nodes, materials, scene } = useGLTF(`${gltf}`)
+    useEffect(() => {
+      const prevMaterial = grpref.current.children[0].material
+      console.log(new THREE.Color(prevMaterial.color).getHexString())
+      const newMaterial = new THREE.MeshStandardMaterial({
+        color: '#5f5f5f',
+      })
+      grpref.current.children[0].material = newMaterial
+    }, [])
+    const createMeshes = (node) => {
+      const meshes = []
+
+      if (node.isMesh) {
+        const material = materials[node.material.name]
+        const newMaterial = new THREE.MeshStandardMaterial({
+          color: 'red',
+        })
+        const geometry = node.geometry
+        console.log(node.name)
+        const mesh = <mesh key={node.name} material={material} geometry={geometry} />
+        meshes.push(mesh)
+      }
+
+      if (node.children) {
+        node.children.forEach((child) => {
+          meshes.push(...createMeshes(child))
+        })
+      }
+
+      return meshes
+    }
+
+    const meshes = createMeshes(scene)
+
+    return <group ref={grpref}>{meshes}</group>
+  } else {
+    return null
+  }
+}
 export default function Page() {
+  const [dragActive, setDragActive] = useState<boolean>(false)
+  const [currentModel, setCurrentModel] = useState(null)
+
+  const handleDrag = (e: DragEvent<HTMLFormElement | HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true)
+    } else if (e.type === 'dragleave') {
+      setDragActive(false)
+    }
+  }
+  const handleDrop = async (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    // validate file type
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const files = Array.from(e.dataTransfer.files)
+
+      if (files.length !== 1) {
+        alert(
+          `  title: 'Invalid file type',
+            description: 'Only image files are allowed.,`,
+        )
+      }
+
+      const file = e.dataTransfer.files[0]
+
+      setCurrentModel(URL.createObjectURL(file))
+    }
+  }
+  const handleChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault()
+
+    try {
+      if (e.target.files && e.target.files[0]) {
+        // at least one file has been selected
+
+        // validate file type
+        const file = e.target.files[0]
+        setCurrentModel(URL.createObjectURL(file))
+      }
+    } catch (error) {
+      // already handled
+    }
+  }
   return (
     <>
-      <div className='mx-auto flex w-full flex-col flex-wrap items-center md:flex-row  lg:w-4/5'>
-        {/* jumbo */}
-        <div className='flex w-full flex-col items-start justify-center p-12 text-center md:w-2/5 md:text-left'>
-          <p className='w-full uppercase'>Next + React Three Fiber</p>
-          <h1 className='my-4 text-5xl font-bold leading-tight'>Next 3D Starter</h1>
-          <p className='mb-8 text-2xl leading-normal'>A minimalist starter for React, React-three-fiber and Threejs.</p>
+      <View orbit className='z-0 h-[100vh] w-full'>
+        <Suspense fallback={null}>
+          <Model gltf={currentModel} />
+          <Common color={'#202125'} />
+        </Suspense>
+      </View>
+      {currentModel == null && (
+        <div
+          style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
+          className='z-10 w-[50%]  h-[50vh] bg-black text-white absolute '
+        >
+          <form
+            onSubmit={(e) => e.preventDefault()}
+            onDragEnter={handleDrag}
+            className='flex h-full items-center bg-blue-300 w-full lg:w-2/3 justify-start'
+          >
+            <label
+              htmlFor='dropzone-file'
+              className={cn(
+                'group relative h-full flex flex-col items-center justify-center w-full aspect-video border-2 border-slate-300 border-dashed rounded-lg dark:border-gray-600 transition',
+                { 'dark:border-slate-400 dark:bg-slate-800': dragActive },
+              )}
+            >
+              <div className={cn('relative w-full h-full flex flex-col items-center justify-center')}>
+                <div
+                  className='absolute inset-0 cursor-pointer'
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                />
+                <input onChange={handleChange} accept='model' id='dropzone-file' type='file' />
+              </div>
+            </label>
+          </form>
         </div>
-
-        <div className='w-full text-center md:w-3/5'>
-          <View className='flex h-96 w-full flex-col items-center justify-center'>
-            <Suspense fallback={null}>
-              <Logo route='/blob' scale={0.6} position={[0, 0, 0]} />
-              <Common />
-            </Suspense>
-          </View>
-        </div>
-      </div>
-
-      <div className='mx-auto flex w-full flex-col flex-wrap items-center p-12 md:flex-row  lg:w-4/5'>
-        {/* first row */}
-        <div className='relative h-48 w-full py-6 sm:w-1/2 md:my-12 md:mb-40'>
-          <h2 className='mb-3 text-3xl font-bold leading-none text-gray-800'>Events are propagated</h2>
-          <p className='mb-8 text-gray-600'>Drag, scroll, pinch, and rotate the canvas to explore the 3D scene.</p>
-        </div>
-        <div className='relative my-12 h-48 w-full py-6 sm:w-1/2 md:mb-40'>
-          <View orbit className='relative h-full  sm:h-48 sm:w-full'>
-            <Suspense fallback={null}>
-              <Dog scale={2} position={[0, -1.6, 0]} rotation={[0.0, -0.3, 0]} />
-              <Common color={'lightpink'} />
-            </Suspense>
-          </View>
-        </div>
-        {/* second row */}
-        <div className='relative my-12 h-48 w-full py-6 sm:w-1/2 md:mb-40'>
-          <View orbit className='relative h-full animate-bounce sm:h-48 sm:w-full'>
-            <Suspense fallback={null}>
-              <Duck route='/blob' scale={2} position={[0, -1.6, 0]} />
-              <Common color={'lightblue'} />
-            </Suspense>
-          </View>
-        </div>
-        <div className='w-full p-6 sm:w-1/2'>
-          <h2 className='mb-3 text-3xl font-bold leading-none text-gray-800'>Dom and 3D are synchronized</h2>
-          <p className='mb-8 text-gray-600'>
-            3D Divs are renderer through the View component. It uses gl.scissor to cut the viewport into segments. You
-            tie a view to a tracking div which then controls the position and bounds of the viewport. This allows you to
-            have multiple views with a single, performant canvas. These views will follow their tracking elements,
-            scroll along, resize, etc.
-          </p>
-        </div>
-      </div>
+      )}
     </>
   )
 }
