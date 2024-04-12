@@ -1,11 +1,13 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { Suspense, useEffect, useRef } from 'react'
+import { Suspense, useCallback, useEffect, useRef } from 'react'
 import { useState, type ChangeEvent, type DragEvent } from 'react'
 import { cn } from './lib/utils'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { ModelMaterial, useGlobalRefStore, useMaterialStore } from './lib/store'
+import MaterialPanel from './components/MaterialPanel'
 const View = dynamic(() => import('@/components/canvas/View').then((mod) => mod.View), {
   ssr: false,
   loading: () => (
@@ -24,27 +26,25 @@ const View = dynamic(() => import('@/components/canvas/View').then((mod) => mod.
 const Common = dynamic(() => import('@/components/canvas/View').then((mod) => mod.Common), { ssr: false })
 
 function Model({ gltf }) {
-  if (gltf) {
-    const grpref = useRef()
-    const { nodes, materials, scene } = useGLTF(`${gltf}`)
-    useEffect(() => {
-      const prevMaterial = grpref.current.children[0].material
-      console.log(new THREE.Color(prevMaterial.color).getHexString())
-      const newMaterial = new THREE.MeshStandardMaterial({
-        color: '#5f5f5f',
-      })
-      grpref.current.children[0].material = newMaterial
-    }, [])
-    const createMeshes = (node) => {
+  const grpref = useRef<THREE.Group>()
+  const setGlobalRef = useGlobalRefStore((state) => state.setGlobalRef)
+  const addMaterial = useMaterialStore((state) => state.addMaterial)
+  const { materials, scene } = useGLTF(`${gltf}`, true)
+  const tr = gltf === './cube.glb'
+  const createMeshes = useCallback(
+    (node) => {
       const meshes = []
 
       if (node.isMesh) {
         const material = materials[node.material.name]
-        const newMaterial = new THREE.MeshStandardMaterial({
-          color: 'red',
-        })
         const geometry = node.geometry
-        console.log(node.name)
+        const newMaterial: ModelMaterial = {
+          node: node.name,
+          name: node.material.name,
+          material: material,
+        }
+        addMaterial(newMaterial)
+
         const mesh = <mesh key={node.name} material={material} geometry={geometry} />
         meshes.push(mesh)
       }
@@ -56,10 +56,21 @@ function Model({ gltf }) {
       }
 
       return meshes
+    },
+    [tr],
+  )
+
+  useEffect(() => {
+    console.log(gltf)
+
+    if (gltf) {
+      console.log('grpref.current')
+      setGlobalRef(grpref)
     }
+  }, [gltf])
 
+  if (gltf !== './cube.glb') {
     const meshes = createMeshes(scene)
-
     return <group ref={grpref}>{meshes}</group>
   } else {
     return null
@@ -117,7 +128,7 @@ export default function Page() {
     <>
       <View orbit className='z-0 h-[100vh] w-full'>
         <Suspense fallback={null}>
-          <Model gltf={currentModel} />
+          <Model gltf={currentModel ? currentModel : './cube.glb'} />
           <Common color={'#202125'} />
         </Suspense>
       </View>
@@ -152,6 +163,7 @@ export default function Page() {
           </form>
         </div>
       )}
+      {currentModel && <MaterialPanel />}
     </>
   )
 }
