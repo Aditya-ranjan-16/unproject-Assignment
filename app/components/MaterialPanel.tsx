@@ -1,58 +1,79 @@
 'use client'
 
-import { ModelMaterial, useGlobalRefStore, useMaterialStore } from '@/lib/store'
-import { useEffect, useState } from 'react'
+import { ModelMaterial, useMaterialStore, useModelPaneStore } from '@/lib/store'
+import { use, useEffect, useState } from 'react'
 import { Color } from 'three'
-import MaterialPane from './MaterialPane'
 
+function getImageUrl(texture: any) {
+  if (texture) {
+    const canvas = document.createElement('canvas')
+    const context = canvas.getContext('2d')
+    canvas.width = texture.image.width
+    canvas.height = texture.image.height
+    context.drawImage(texture.image, 0, 0)
+
+    const url = canvas.toDataURL()
+    canvas.remove()
+    return url
+  }
+}
 export default function MaterialPanel() {
-  const [materialPane, setMaterialPane] = useState(false)
   const materials = useMaterialStore((state) => state.materials)
-  const [curretMaterial, setCurretMaterial] = useState<number>(0)
-  const globalref = useGlobalRefStore((state) => state.globalRef)
+  const togglepane = useModelPaneStore((state) => state.togglePane)
+  const setTogglePane = useModelPaneStore((state) => state.setTogglePane)
+  const curretMaterial = useModelPaneStore((state) => state.currentMaterial)
+  const setCurretMaterial = useModelPaneStore((state) => state.setCurrentMaterial)
 
-  const togglePane = (index: number) => {
+  const toggleMaterialPane = (index: number) => {
     if (curretMaterial !== index) {
       setCurretMaterial(index)
-      setMaterialPane(true)
+      setTogglePane(true)
     } else {
-      setMaterialPane((prev) => !prev)
+      setTogglePane(!togglepane)
     }
   }
-  const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const color = new Color(e.target.value)
-    // curretMaterial.material.color = color
-    // useMaterialStore.getState().updateMaterial(curretMaterial)
+  const getColorString = (index: number) => {
+    const color = new Color(materials[index].material.color).getHexString()
+    return color
   }
   useEffect(() => {
-    console.log(materials)
-    setCurretMaterial(materials[0])
-  }, [materials, globalref])
+    // console.log(materials.length)
+    // console.log('Material panel rerendered')
+  }, [materials])
 
   return (
     <>
-      <div className='z-10 w-[20%] top-[20%] h-[50vh] right-4 bg-slate-500 text-white absolute'>
-        {materials.map((val: ModelMaterial, i) => {
-          const color = new Color(globalref.current.children[i].material.color).getHexString()
-          return (
-            <div
-              key={i}
-              onClick={() => togglePane(i)}
-              className='group flex items-center gap-2 p-2 cursor-pointer justify-start'
-            >
+      {materials.length !== 0 && (
+        <div className='z-10 w-[20%] overflow-y-scroll top-[20%] h-[50vh] right-4 bg-slate-500 text-white absolute'>
+          {materials.map((val: ModelMaterial, i) => {
+            var imgsrc = ''
+            if (val.material.map) {
+              imgsrc = getImageUrl(val.material.map)
+            }
+            return (
               <div
-                style={{ backgroundColor: `#${color}` }}
-                className={`w-4 h-4 first-child-div group-hover:border-2 border-black rounded-full`}
-              ></div>
-              <div>
-                {val.name}
-                <span className='text-gray-700'>{`- [${val.node}]`}</span>
+                key={val.name}
+                onClick={() => toggleMaterialPane(i)}
+                className='group flex items-center gap-2 p-2 cursor-pointer justify-start'
+              >
+                {imgsrc === '' && (
+                  <div
+                    style={{ backgroundColor: `#${getColorString(i)}` }}
+                    className={`w-8 h-8 first-child-div group-hover:border-2 border-white p-[1px] rounded-full`}
+                  ></div>
+                )}
+                {imgsrc !== '' && (
+                  <img
+                    className='w-8 h-8 first-child-div group-hover:border-2 border-white p-[1px] rounded-full'
+                    src={imgsrc}
+                  />
+                )}
+                <div>{val.name}</div>
               </div>
-            </div>
-          )
-        })}
-      </div>
-      {materialPane && <MaterialPane key={curretMaterial} currentMaterial={curretMaterial} />}
+            )
+          })}
+        </div>
+      )}
     </>
   )
 }

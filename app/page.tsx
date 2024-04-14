@@ -6,8 +6,9 @@ import { useState, type ChangeEvent, type DragEvent } from 'react'
 import { cn } from './lib/utils'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { ModelMaterial, useGlobalRefStore, useMaterialStore } from './lib/store'
+import { useMaterialStore, useModelPaneStore } from './lib/store'
 import MaterialPanel from './components/MaterialPanel'
+import MaterialPane from './components/MaterialPane'
 const View = dynamic(() => import('@/components/canvas/View').then((mod) => mod.View), {
   ssr: false,
   loading: () => (
@@ -27,51 +28,25 @@ const Common = dynamic(() => import('@/components/canvas/View').then((mod) => mo
 
 function Model({ gltf }) {
   const grpref = useRef<THREE.Group>()
-  const setGlobalRef = useGlobalRefStore((state) => state.setGlobalRef)
+
   const addMaterial = useMaterialStore((state) => state.addMaterial)
   const { materials, scene } = useGLTF(`${gltf}`, true)
-  const tr = gltf === './cube.glb'
-  const createMeshes = useCallback(
-    (node) => {
-      const meshes = []
-
-      if (node.isMesh) {
-        const material = materials[node.material.name]
-        const geometry = node.geometry
-        const newMaterial: ModelMaterial = {
-          node: node.name,
-          name: node.material.name,
-          material: material,
-        }
-        addMaterial(newMaterial)
-
-        const mesh = <mesh key={node.name} material={material} geometry={geometry} />
-        meshes.push(mesh)
-      }
-
-      if (node.children) {
-        node.children.forEach((child) => {
-          meshes.push(...createMeshes(child))
-        })
-      }
-
-      return meshes
-    },
-    [tr],
-  )
-
   useEffect(() => {
-    console.log(gltf)
-
     if (gltf) {
-      console.log('grpref.current')
-      setGlobalRef(grpref)
+      if (gltf !== './cube.glb') {
+        console.log('glb component rerendered')
+        for (let key in materials) {
+          addMaterial({
+            name: key,
+            material: materials[key],
+          })
+        }
+      }
     }
   }, [gltf])
 
   if (gltf !== './cube.glb') {
-    const meshes = createMeshes(scene)
-    return <group ref={grpref}>{meshes}</group>
+    return <primitive object={scene} ref={grpref} />
   } else {
     return null
   }
@@ -79,7 +54,8 @@ function Model({ gltf }) {
 export default function Page() {
   const [dragActive, setDragActive] = useState<boolean>(false)
   const [currentModel, setCurrentModel] = useState(null)
-
+  const currentMaterial = useModelPaneStore((state) => state.currentMaterial)
+  const togglepane = useModelPaneStore((state) => state.togglePane)
   const handleDrag = (e: DragEvent<HTMLFormElement | HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
@@ -124,6 +100,9 @@ export default function Page() {
       // already handled
     }
   }
+  useEffect(() => {
+    console.log('caalled page')
+  }, [])
   return (
     <>
       <View orbit className='z-0 h-[100vh] w-full'>
@@ -163,7 +142,12 @@ export default function Page() {
           </form>
         </div>
       )}
-      {currentModel && <MaterialPanel />}
+      {currentModel && (
+        <>
+          <MaterialPanel />
+          {togglepane && <MaterialPane currentMaterial={currentMaterial} />}
+        </>
+      )}
     </>
   )
 }

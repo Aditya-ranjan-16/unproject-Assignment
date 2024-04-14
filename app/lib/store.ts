@@ -4,8 +4,7 @@ import { create } from "zustand";
 import * as THREE from 'three'
 export type ModelMaterial={
     name:string
-    node:string
-    material:THREE.MeshStandardMaterial | THREE.Material
+    material:THREE.Material
 }
 
 export type ModelMaterialStore={
@@ -13,34 +12,30 @@ export type ModelMaterialStore={
 }
 export type ModelMaterialStoreActions={
     addMaterial:(material:ModelMaterial)=>void
-    removeallMaterials:()=>void
-    updateMaterial:(material:ModelMaterial)=>void
+
 }
 export const useMaterialStore = create<ModelMaterialStore &  ModelMaterialStoreActions>()((set)=>({
     materials:[],
     addMaterial:(material:ModelMaterial)=>{
-        const exists=useMaterialStore.getState().materials.find((m)=>m.name===material.name)
-        if(exists) return 
+        
         set((state)=>({
             materials:[...state.materials,material]
         }))
-    },
-    updateMaterial:(material:ModelMaterial)=>{
-        set((state)=>({
-            materials:state.materials.map((m)=>m.name===material.name?material:m)
-        }))
-    },
-    removeallMaterials:()=>{
-        set({materials:[]})
     }
 
 }))
 
-type ModelRefStore={
-    globalRef:MutableRefObject<THREE.Group<THREE.Object3DEventMap>>
-    setGlobalRef:(ref:MutableRefObject<THREE.Group<THREE.Object3DEventMap>>)=>void
+
+
+type ModelPaneStore={
+    togglePane:boolean
+    setTogglePane:(val:boolean)=>void,
+    currentMaterial:number,
+    setCurrentMaterial:(val:number)=>void,
 }
-export const useGlobalRefStore = create<ModelRefStore>((set) => ({
-  globalRef: null,
-  setGlobalRef: (ref:MutableRefObject<THREE.Group<THREE.Object3DEventMap>>) => set({ globalRef: ref }),
+export const useModelPaneStore = create<ModelPaneStore>((set) => ({
+  togglePane:false, 
+  setTogglePane:(val:boolean)=>set({togglePane:val}),
+  currentMaterial:0,
+  setCurrentMaterial:(val:number)=>set({currentMaterial:val})
 }));
