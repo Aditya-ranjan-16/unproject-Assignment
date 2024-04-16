@@ -1,14 +1,15 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { Suspense, useCallback, useEffect, useRef } from 'react'
+import { Suspense, useEffect, useRef } from 'react'
 import { useState, type ChangeEvent, type DragEvent } from 'react'
 import { cn } from './lib/utils'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { useMaterialStore, useModelPaneStore } from './lib/store'
+import { useGlobalRefStore, useMaterialStore, useModelPaneStore } from './lib/store'
 import MaterialPanel from './components/MaterialPanel'
 import MaterialPane from './components/MaterialPane'
+
 const View = dynamic(() => import('@/components/canvas/View').then((mod) => mod.View), {
   ssr: false,
   loading: () => (
@@ -29,62 +30,58 @@ const Common = dynamic(() => import('@/components/canvas/View').then((mod) => mo
 function Model({ gltf }) {
   const grpref = useRef<THREE.Group>()
 
+  const setGlobalRef = useGlobalRefStore((state) => state.setGlobalRef)
   const addMaterial = useMaterialStore((state) => state.addMaterial)
   const { materials, scene } = useGLTF(`${gltf}`, true)
+  const ongroupClick = () => {
+    // const findMaterialByName = (node, name) => {
+    //   if (node.material && node.material.name === name) {
+    //     return node.material
+    //   }
+    //   for (const child of node.children) {
+    //     const material = findMaterialByName(child, name)
+    //     if (material) return material
+    //   }
+    //   return null
+    // }
+    // const materialToChange = findMaterialByName(grpref.current, 'Screen')
+    // console.log(materialToChange)
+  }
+  const showinfo = () => {
+    console.log(grpref)
+  }
+
   useEffect(() => {
     if (gltf) {
       if (gltf !== './cube.glb') {
         console.log('glb component rerendered')
         for (let key in materials) {
+          materials[key].transparent = true
           addMaterial({
             name: key,
             material: materials[key],
           })
         }
+        setGlobalRef(grpref)
       }
     }
   }, [gltf])
 
   if (gltf !== './cube.glb') {
-    return <primitive object={scene} ref={grpref} />
+    return (
+      <group onClick={ongroupClick} onDoubleClick={showinfo}>
+        <primitive object={scene} ref={grpref} />
+      </group>
+    )
   } else {
     return null
   }
 }
 export default function Page() {
-  const [dragActive, setDragActive] = useState<boolean>(false)
   const [currentModel, setCurrentModel] = useState(null)
   const currentMaterial = useModelPaneStore((state) => state.currentMaterial)
   const togglepane = useModelPaneStore((state) => state.togglePane)
-  const handleDrag = (e: DragEvent<HTMLFormElement | HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true)
-    } else if (e.type === 'dragleave') {
-      setDragActive(false)
-    }
-  }
-  const handleDrop = async (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
 
-    // validate file type
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const files = Array.from(e.dataTransfer.files)
-
-      if (files.length !== 1) {
-        alert(
-          `  title: 'Invalid file type',
-            description: 'Only image files are allowed.,`,
-        )
-      }
-
-      const file = e.dataTransfer.files[0]
-
-      setCurrentModel(URL.createObjectURL(file))
-    }
-  }
   const handleChange = async (e: ChangeEvent<HTMLInputElement>) => {
     e.preventDefault()
 
@@ -100,9 +97,7 @@ export default function Page() {
       // already handled
     }
   }
-  useEffect(() => {
-    console.log('caalled page')
-  }, [])
+
   return (
     <>
       <View orbit className='z-0 h-[100vh] w-full'>
@@ -118,25 +113,17 @@ export default function Page() {
         >
           <form
             onSubmit={(e) => e.preventDefault()}
-            onDragEnter={handleDrag}
-            className='flex h-full items-center bg-blue-300 w-full lg:w-2/3 justify-start'
+            className='flex h-full items-center bg-blue-300 w-full  justify-start'
           >
             <label
               htmlFor='dropzone-file'
-              className={cn(
-                'group relative h-full flex flex-col items-center justify-center w-full aspect-video border-2 border-slate-300 border-dashed rounded-lg dark:border-gray-600 transition',
-                { 'dark:border-slate-400 dark:bg-slate-800': dragActive },
-              )}
+              className={
+                'group relative h-full flex flex-col items-center justify-center w-full aspect-video border-2 border-slate-300 border-dashed rounded-lg dark:border-gray-600 transition'
+              }
             >
               <div className={cn('relative w-full h-full flex flex-col items-center justify-center')}>
-                <div
-                  className='absolute inset-0 cursor-pointer'
-                  onDragEnter={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDragOver={handleDrag}
-                  onDrop={handleDrop}
-                />
-                <input onChange={handleChange} accept='model' id='dropzone-file' type='file' />
+                <div className='absolute inset-0 cursor-pointer' />
+                <input onChange={handleChange} accept='.glb, .gltf' id='dropzone-file' type='file' />
               </div>
             </label>
           </form>

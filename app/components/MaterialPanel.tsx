@@ -1,7 +1,7 @@
 'use client'
 
 import { ModelMaterial, useMaterialStore, useModelPaneStore } from '@/lib/store'
-import { use, useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Color } from 'three'
 
 function getImageUrl(texture: any) {
@@ -11,7 +11,6 @@ function getImageUrl(texture: any) {
     canvas.width = texture.image.width
     canvas.height = texture.image.height
     context.drawImage(texture.image, 0, 0)
-
     const url = canvas.toDataURL()
     canvas.remove()
     return url
@@ -23,7 +22,6 @@ export default function MaterialPanel() {
   const setTogglePane = useModelPaneStore((state) => state.setTogglePane)
   const curretMaterial = useModelPaneStore((state) => state.currentMaterial)
   const setCurretMaterial = useModelPaneStore((state) => state.setCurrentMaterial)
-
   const toggleMaterialPane = (index: number) => {
     if (curretMaterial !== index) {
       setCurretMaterial(index)
@@ -39,7 +37,7 @@ export default function MaterialPanel() {
   useEffect(() => {
     // console.log(materials.length)
     // console.log('Material panel rerendered')
-  }, [materials])
+  }, [materials, materials[curretMaterial]])
 
   return (
     <>
