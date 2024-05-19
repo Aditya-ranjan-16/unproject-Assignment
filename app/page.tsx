@@ -4,11 +4,12 @@ import dynamic from 'next/dynamic'
 import { Suspense, useEffect, useRef } from 'react'
 import { useState, type ChangeEvent, type DragEvent } from 'react'
 import { cn } from './lib/utils'
-import { useGLTF } from '@react-three/drei'
+import { useAnimations, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { useGlobalRefStore, useMaterialStore, useModelPaneStore } from './lib/store'
+import { useGlobalAnimationStore, useGlobalRefStore, useMaterialStore, useModelPaneStore } from './lib/store'
 import MaterialPanel from './components/MaterialPanel'
 import MaterialPane from './components/MaterialPane'
+import AnimationPanel from './components/AnimationPanel'
 
 const View = dynamic(() => import('@/components/canvas/View').then((mod) => mod.View), {
   ssr: false,
@@ -31,8 +32,11 @@ function Model({ gltf }) {
   const grpref = useRef<THREE.Group>()
 
   const setGlobalRef = useGlobalRefStore((state) => state.setGlobalRef)
+  const setGlobalAnimRef = useGlobalAnimationStore((state) => state.setGlobalAnimRef)
+  const setAnimations = useGlobalAnimationStore((state) => state.setAnimations)
   const addMaterial = useMaterialStore((state) => state.addMaterial)
-  const { materials, scene } = useGLTF(`${gltf}`, true)
+  const { materials, scene, animations } = useGLTF(`${gltf}`, true)
+  const { actions, names } = useAnimations(animations, scene)
   const ongroupClick = () => {
     // const findMaterialByName = (node, name) => {
     //   if (node.material && node.material.name === name) {
@@ -63,6 +67,10 @@ function Model({ gltf }) {
           })
         }
         setGlobalRef(grpref)
+        if (animations && animations.length) {
+          setGlobalAnimRef(actions)
+          setAnimations(names)
+        }
       }
     }
   }, [gltf])
@@ -81,20 +89,31 @@ export default function Page() {
   const [currentModel, setCurrentModel] = useState(null)
   const currentMaterial = useModelPaneStore((state) => state.currentMaterial)
   const togglepane = useModelPaneStore((state) => state.togglePane)
+  function saveBlob(blob, fileName) {
+    var a = document.createElement('a')
+    document.body.appendChild(a)
+    a.style.display = 'none'
 
+    var url = window.URL.createObjectURL(blob)
+    a.href = url
+    a.download = fileName
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+  const getNameWithoutExtension = (fileName: string): string => {
+    const filename_and_extensions = fileName.split('.')
+    return filename_and_extensions[filename_and_extensions.length - 2]
+  }
   const handleChange = async (e: ChangeEvent<HTMLInputElement>) => {
     e.preventDefault()
 
     try {
       if (e.target.files && e.target.files[0]) {
-        // at least one file has been selected
-
-        // validate file type
-        const file = e.target.files[0]
+        let file = e.target.files[0]
         setCurrentModel(URL.createObjectURL(file))
       }
     } catch (error) {
-      // already handled
+      console.log(error)
     }
   }
 
@@ -123,7 +142,7 @@ export default function Page() {
             >
               <div className={cn('relative w-full h-full flex flex-col items-center justify-center')}>
                 <div className='absolute inset-0 cursor-pointer' />
-                <input onChange={handleChange} accept='.glb, .gltf' id='dropzone-file' type='file' />
+                <input onChange={handleChange} accept='.glb, .gltf , .fbx' id='dropzone-file' type='file' />
               </div>
             </label>
           </form>
@@ -132,6 +151,7 @@ export default function Page() {
       {currentModel && (
         <>
           <MaterialPanel />
+          <AnimationPanel />
           {togglepane && <MaterialPane currentMaterial={currentMaterial} />}
         </>
       )}

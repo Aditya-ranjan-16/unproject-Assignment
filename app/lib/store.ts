@@ -11,6 +11,30 @@ export const useGlobalRefStore = create<ModelRefStore>((set) => ({
   globalRef: null,
   setGlobalRef: (ref:MutableRefObject<THREE.Group<THREE.Object3DEventMap>>) => set({ globalRef: ref }),
 }));
+
+
+type ModelAnimationStore={
+    globalAnimRef: {
+    [x: string]: THREE.AnimationAction;
+}
+    animations:string[]
+    setAnimations:(animations:string[])=>void
+    setGlobalAnimRef:(ref: {
+    [x: string]: THREE.AnimationAction;
+})=>void
+}
+export const useGlobalAnimationStore = create<ModelAnimationStore>((set) => ({
+  globalAnimRef: {},
+  animations:[],
+  setAnimations:(animations:string[])=>set({animations}),
+  setGlobalAnimRef: (ref: {
+    [x: string]: THREE.AnimationAction;
+}) => set({ globalAnimRef: ref }),
+}));
+
+
+
+
 export type ModelMaterial={
     name:string
     material:THREE.Material|THREE.MeshBasicMaterial|THREE.MeshStandardMaterial|THREE.MeshPhysicalMaterial
