@@ -1,15 +1,16 @@
 'use client'
-
+import * as THREE from 'three'
 import dynamic from 'next/dynamic'
 import { Suspense, useEffect, useRef } from 'react'
 import { useState, type ChangeEvent, type DragEvent } from 'react'
 import { cn } from './lib/utils'
-import { useAnimations, useGLTF } from '@react-three/drei'
-import * as THREE from 'three'
+import { Html, useAnimations, useGLTF } from '@react-three/drei'
 import { useGlobalAnimationStore, useGlobalRefStore, useMaterialStore, useModelPaneStore } from './lib/store'
 import MaterialPanel from './components/MaterialPanel'
 import MaterialPane from './components/MaterialPane'
 import AnimationPanel from './components/AnimationPanel'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter'
 
 const View = dynamic(() => import('@/components/canvas/View').then((mod) => mod.View), {
   ssr: false,
@@ -54,7 +55,17 @@ function Model({ gltf }) {
   const showinfo = () => {
     console.log(grpref)
   }
+  const annotations = []
 
+  scene.traverse((o) => {
+    if (o.userData.prop) {
+      annotations.push(
+        <Html key={o.uuid} position={[o.position.x, o.position.y, o.position.z]} distanceFactor={0.25}>
+          <div className='bg-red-400'>{o.userData.prop}</div>
+        </Html>,
+      )
+    }
+  })
   useEffect(() => {
     if (gltf) {
       if (gltf !== './cube.glb') {
@@ -78,7 +89,9 @@ function Model({ gltf }) {
   if (gltf !== './cube.glb') {
     return (
       <group onClick={ongroupClick} onDoubleClick={showinfo}>
-        <primitive object={scene} ref={grpref} />
+        <primitive object={scene} ref={grpref}>
+          {annotations}
+        </primitive>
       </group>
     )
   } else {
@@ -89,17 +102,7 @@ export default function Page() {
   const [currentModel, setCurrentModel] = useState(null)
   const currentMaterial = useModelPaneStore((state) => state.currentMaterial)
   const togglepane = useModelPaneStore((state) => state.togglePane)
-  function saveBlob(blob, fileName) {
-    var a = document.createElement('a')
-    document.body.appendChild(a)
-    a.style.display = 'none'
 
-    var url = window.URL.createObjectURL(blob)
-    a.href = url
-    a.download = fileName
-    a.click()
-    window.URL.revokeObjectURL(url)
-  }
   const getNameWithoutExtension = (fileName: string): string => {
     const filename_and_extensions = fileName.split('.')
     return filename_and_extensions[filename_and_extensions.length - 2]
@@ -110,7 +113,25 @@ export default function Page() {
     try {
       if (e.target.files && e.target.files[0]) {
         let file = e.target.files[0]
-        setCurrentModel(URL.createObjectURL(file))
+        const url = URL.createObjectURL(file)
+        setCurrentModel(url)
+        const loader = new GLTFLoader()
+        const exporter = new GLTFExporter()
+        loader.load(url, (gltf) => {
+          exporter.parse(
+            gltf.scene,
+            (result) => {
+              const output = new Blob([result as any], { type: 'model/gltf-binary' })
+              const link = document.createElement('a')
+              link.href = URL.createObjectURL(output)
+              const fname = getNameWithoutExtension(file.name)
+              link.download = `${fname}-Seperated.glb`
+              link.click()
+            },
+            null, // Error callback (optional, can be null)
+            { binary: true }, // Export as binary .glb
+          )
+        })
       }
     } catch (error) {
       console.log(error)
@@ -122,6 +143,9 @@ export default function Page() {
       <View orbit className='z-0 h-[100vh] w-full'>
         <Suspense fallback={null}>
           <Model gltf={currentModel ? currentModel : './cube.glb'} />
+          {/* <EffectComposer>
+            <BrightnessContrast brightness={brightness} contrast={constrast} />
+          </EffectComposer> */}
           <Common color={'#202125'} />
         </Suspense>
       </View>
